@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox)
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QKeyEvent
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 import requests
@@ -10,18 +10,19 @@ import requests
 class MapApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Яндекс Карты")
+        self.setWindowTitle("Яндекс Карты с управлением клавишами")
         self.setGeometry(100, 100, 800, 600)
+
         self.latitude = 55.753995
         self.longitude = 37.621094
         self.zoom = 15
         self.map_type = "map"
+        self.MIN_ZOOM = 1
+        self.MAX_ZOOM = 17
 
         self.init_ui()
-
         self.network_manager = QNetworkAccessManager()
         self.network_manager.finished.connect(self.handle_map_response)
-
         self.update_map()
 
     def init_ui(self):
@@ -36,7 +37,7 @@ class MapApp(QMainWindow):
         control_layout.addWidget(self.coord_input)
 
         self.zoom_input = QLineEdit(str(self.zoom))
-        self.zoom_input.setPlaceholderText("Масштаб (1-17)")
+        self.zoom_input.setPlaceholderText(f"Масштаб ({self.MIN_ZOOM}-{self.MAX_ZOOM})")
         control_layout.addWidget(self.zoom_input)
 
         self.search_btn = QPushButton("Поиск")
@@ -52,10 +53,12 @@ class MapApp(QMainWindow):
         control_layout.addWidget(self.address_btn)
 
         layout.addLayout(control_layout)
+
         self.map_label = QLabel()
         self.map_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.map_label.setMinimumSize(600, 400)
         layout.addWidget(self.map_label)
+
         map_type_layout = QHBoxLayout()
 
         self.map_btn = QPushButton("Схема")
@@ -71,6 +74,25 @@ class MapApp(QMainWindow):
         map_type_layout.addWidget(self.hybrid_btn)
 
         layout.addLayout(map_type_layout)
+
+        hint = QLabel("Используйте PgUp/PgDown для изменения масштаба")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key.Key_PageUp:
+            self.change_zoom(1)
+        elif event.key() == Qt.Key.Key_PageDown:
+            self.change_zoom(-1)
+        else:
+            super().keyPressEvent(event)
+
+    def change_zoom(self, delta):
+        new_zoom = self.zoom + delta
+        if self.MIN_ZOOM <= new_zoom <= self.MAX_ZOOM:
+            self.zoom = new_zoom
+            self.zoom_input.setText(str(self.zoom))
+            self.update_map()
 
     def set_map_type(self, map_type):
         self.map_type = map_type
@@ -106,7 +128,7 @@ class MapApp(QMainWindow):
 
                 zoom = self.zoom_input.text().strip()
                 if zoom:
-                    self.zoom = max(1, min(17, int(zoom)))
+                    self.zoom = max(self.MIN_ZOOM, min(self.MAX_ZOOM, int(zoom)))
                     self.zoom_input.setText(str(self.zoom))
 
                 self.update_map()
